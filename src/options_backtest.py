@@ -1,8 +1,8 @@
 import numpy as np
 import pandas as pd
 from scipy.stats import norm
-from data_loader import carregar_dados_ativo
-from elder_engine import calcular_telas_elder
+from src.data_loader import carregar_dados_ativo
+from src.elder_engine import calcular_telas_elder
 
 def black_scholes_call(S, K, T, r, sigma):
     """Calcula o prêmio teórico de uma Call via Black-Scholes."""

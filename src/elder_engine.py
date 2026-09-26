@@ -1,6 +1,6 @@
 import pandas as pd
 import numpy as np
-from data_loader import carregar_dados_ativo
+from src.data_loader import carregar_dados_ativo
 
 def calcular_telas_elder(df_diario: pd.DataFrame, df_semanal: pd.DataFrame):
     """
