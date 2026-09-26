@@ -1,7 +1,7 @@
 import pandas as pd
 import numpy as np
 
-# Import protegido para funcionar tanto a partir da raiz quanto dentro de src
+# Import protegido para execução tanto pela raiz quanto por dentro de src
 try:
     from src.data_loader import carregar_dados_ativo
 except ModuleNotFoundError:
@@ -10,20 +10,25 @@ except ModuleNotFoundError:
 
 def calcular_telas_elder(df_diario: pd.DataFrame, df_semanal: pd.DataFrame):
     """
-    Teorema do Triple Screen Bidirecional (Alta e Baixa):
+    Triple Screen Bidirecional com SELETOR DE REGIME MACRO (MME 200):
     
-    COMPRA (CALL):
-    - Tela 1: MME 13 Semanal subindo E Preço acima da MME 50 Semanal (Maré de Alta).
-    - Tela 2: IFR-2 Diário em sobrevenda (IFR2 < 15, recuo pontual).
-    - Tela 3: Rompimento da máxima do pregão anterior (Gatilho de Compra).
+    1. REGIME DE ALTA (Close > MME 200 Diária):
+       - Permite estritamente operações de CALL.
+       - Bloqueia compras de PUT.
     
-    VENDA (PUT):
-    - Tela 1: MME 13 Semanal descendo E Preço abaixo da MME 50 Semanal (Maré de Baixa).
-    - Tela 2: IFR-2 Diário em sobrecompra (IFR2 > 85, repique pontual).
-    - Tela 3: Perda da mínima do pregão anterior (Gatilho de Venda).
+    2. REGIME DE BAIXA (Close < MME 200 Diária):
+       - Permite estritamente operações de PUT.
+       - Bloqueia compras de CALL.
     """
     df_d = df_diario.copy()
     df_s = df_semanal.copy()
+
+    # =========================================================================
+    # SELETOR DE REGIME MACRO (Gráfico Diário - MME 200)
+    # =========================================================================
+    df_d['EMA200'] = df_d['Close'].ewm(span=200, adjust=False).mean()
+    df_d['Regime_Bull'] = df_d['Close'] > df_d['EMA200']
+    df_d['Regime_Bear'] = df_d['Close'] < df_d['EMA200']
 
     # =========================================================================
     # TELA 1: A MARÉ MACRO (Gráfico Semanal)
@@ -31,13 +36,13 @@ def calcular_telas_elder(df_diario: pd.DataFrame, df_semanal: pd.DataFrame):
     df_s['EMA13'] = df_s['Close'].ewm(span=13, adjust=False).mean()
     df_s['EMA50'] = df_s['Close'].ewm(span=50, adjust=False).mean()
 
-    # Maré de Alta: MME 13 inclinada para cima E Preço Semanal acima da MME 50
+    # Maré de Alta: MME 13 subindo E Preço Semanal acima da MME 50
     df_s['Maree_Alta'] = (df_s['EMA13'] > df_s['EMA13'].shift(1)) & (df_s['Close'] > df_s['EMA50'])
 
-    # Maré de Baixa: MME 13 inclinada para baixo E Preço Semanal abaixo da MME 50
+    # Maré de Baixa: MME 13 caindo E Preço Semanal abaixo da MME 50
     df_s['Maree_Baixa'] = (df_s['EMA13'] < df_s['EMA13'].shift(1)) & (df_s['Close'] < df_s['EMA50'])
 
-    # Reindexa as marés semanais para os pregões diários (preenchimento contínuo)
+    # Reindexa as marés semanais para os pregões diários
     df_d['Maree_Alta'] = df_s['Maree_Alta'].reindex(df_d.index, method='ffill')
     df_d['Maree_Baixa'] = df_s['Maree_Baixa'].reindex(df_d.index, method='ffill')
 
@@ -54,24 +59,23 @@ def calcular_telas_elder(df_diario: pd.DataFrame, df_semanal: pd.DataFrame):
     rs = media_ganho / (media_perda + 1e-9)
     df_d['IFR2'] = 100 - (100 / (1 + rs))
 
-    # Recuo na alta: sobrevenda no diário
     df_d['Recuo_Sobrevenda'] = df_d['IFR2'] < 15
-
-    # Repique na baixa: sobrecompra no diário
     df_d['Repique_Sobrecompra'] = df_d['IFR2'] > 85
 
     # =========================================================================
-    # TELA 3: A ONDULAÇÃO (Gatilhos de Execução Diários)
+    # TELA 3: GATILHOS COM SELETOR DE REGIME EMBUTIDO
     # =========================================================================
-    # Gatilho de Compra (Call): Maré Alta + Recuo ontem + Rompimento da máxima hoje
+    # CALL: Maré Semanal Alta + Recuo Diário + Rompimento Máxima + REGIME BULL (Close > MME200)
     df_d['Gatilho_Compra'] = (
+        (df_d['Regime_Bull'] == True) &
         (df_d['Maree_Alta'] == True) &
         (df_d['Recuo_Sobrevenda'].shift(1) == True) &
         (df_d['High'] > df_d['High'].shift(1))
     )
 
-    # Gatilho de Venda (Put): Maré Baixa + Repique ontem + Perda da mínima hoje
+    # PUT: Maré Semanal Baixa + Repique Diário + Perda Mínima + REGIME BEAR (Close < MME200)
     df_d['Gatilho_Venda'] = (
+        (df_d['Regime_Bear'] == True) &
         (df_d['Maree_Baixa'] == True) &
         (df_d['Repique_Sobrecompra'].shift(1) == True) &
         (df_d['Low'] < df_d['Low'].shift(1))
@@ -89,8 +93,8 @@ if __name__ == "__main__":
     vendas = sinais[sinais['Gatilho_Venda'] == True]
 
     print(f"\n=======================================================")
-    print(f"TESTE DE SINAIS BIDIRECIONAIS: {ticker}")
+    print(f"TESTE COM SELETOR DE REGIME (MME 200): {ticker}")
     print(f"=======================================================")
-    print(f"Sinais de Compra (CALL): {len(compras)}")
-    print(f"Sinais de Venda (PUT):   {len(vendas)}")
+    print(f"Sinais de Compra (CALL - Permitidos em Bull): {len(compras)}")
+    print(f"Sinais de Venda (PUT  - Bloqueados se estiver em Bull): {len(vendas)}")
     print(f"=======================================================\n")
