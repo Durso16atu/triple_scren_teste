@@ -3,12 +3,11 @@ import yfinance as yf
 import pandas as pd
 
 # Os 20 ativos com maior liquidez e mercado ativo de opções na B3
-# Os 20 ativos com maior liquidez e mercado ativo de opções na B3
 TICKERS_B3 = [
     "PETR4.SA", "VALE3.SA", "ITUB4.SA", "BBDC4.SA", "BBAS3.SA",
     "RENT3.SA", "B3SA3.SA", "ABEV3.SA", "WEGE3.SA", "SUZB3.SA",
-    "GGBR4.SA", "PRIO3.SA", "ELET6.SA", "CSAN3.SA", "RADL3.SA",
-    "EMBR3.SA", "RAIL3.SA", "VBBR3.SA", "LREN3.SA", "RDOR3.SA"
+    "GGBR4.SA", "PRIO3.SA", "CMIG4.SA", "CSAN3.SA", "RADL3.SA",
+    "SBSP3.SA", "RAIL3.SA", "VBBR3.SA", "LREN3.SA", "RDOR3.SA"
 ]
 
 
