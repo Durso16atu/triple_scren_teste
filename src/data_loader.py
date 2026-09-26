@@ -3,11 +3,12 @@ import yfinance as yf
 import pandas as pd
 
 # Os 20 ativos com maior liquidez e mercado ativo de opções na B3
+# Os 20 ativos com maior liquidez e mercado ativo de opções na B3
 TICKERS_B3 = [
-	"PETR4.SA", "VALE3.SA", "ITUB4.SA", "BBDC4.SA", "BBAS3.SA",
-	"RENT3.SA", "B3SA3.SA", "ABEV3.SA", "WEGE3.SA", "SUZB3.SA",
-	"GGBR4.SA", "PRIO3.SA", "ELET3.SA", "CSAN3.SA", "RADL3.SA",
-	"JBSS3.SA", "RAIL3.SA", "VBBR3.SA", "LREN3.SA", "RDOR3.SA"
+    "PETR4.SA", "VALE3.SA", "ITUB4.SA", "BBDC4.SA", "BBAS3.SA",
+    "RENT3.SA", "B3SA3.SA", "ABEV3.SA", "WEGE3.SA", "SUZB3.SA",
+    "GGBR4.SA", "PRIO3.SA", "ELET6.SA", "CSAN3.SA", "RADL3.SA",
+    "EMBR3.SA", "RAIL3.SA", "VBBR3.SA", "LREN3.SA", "RDOR3.SA"
 ]
 
 
@@ -15,7 +16,7 @@ def carregar_dados_ativo(ticker: str, start: str = "2023-01-01"):
 	"""Baixa dados diários e os agrega em dados semanais para a Tela 1."""
 	print(f"Baixando dados para: {ticker}...")
 
-	df_diario = yf.download(ticker, start=start, progress=False)
+	df_diario = yf.download(ticker, start=start, progress=False).dropna()
 
 	if df_diario.empty:
 		raise ValueError(f"Não foi possível obter dados para {ticker}.")
