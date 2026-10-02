@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html lang="pt-BR" class="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>B3 Triple Screen | Terminal Quant de Opções</title>
+  <!-- Tailwind CSS, Plotly.js & Lucide Icons -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            quant: {
+              dark: '#080c14',
+              card: '#0f172a',
+              border: '#1e293b',
+              accent: '#3b82f6'
+            }
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: #080c14; }
+    ::-webkit-scrollbar-thumb { background: #1e293b; border-radius: 3px; }
+    ::-webkit-scrollbar-thumb:hover { background: #334155; }
+  </style>
+</head>
+<body class="bg-quant-dark text-slate-100 min-h-screen flex flex-col font-sans antialiased">
+
+  <header class="border-b border-quant-border bg-quant-card/90 backdrop-blur-md px-6 py-3.5 flex items-center justify-between sticky top-0 z-50">
+    <div class="flex items-center space-x-3">
+      <div class="bg-blue-600/20 p-2 rounded-lg border border-blue-500/30 text-blue-400">
+        <i data-lucide="activity" class="w-5 h-5"></i>
+      </div>
+      <div>
+        <h1 class="text-base font-bold text-white flex items-center gap-2">
+          Terminal Quant <span class="text-xs text-blue-400 font-mono font-normal">| Triple Screen B3 & Opções</span>
+        </h1>
+        <p class="text-xs text-slate-400">Estratégia Bidirecional de Alexander Elder com Seletor Macro (MME 200)</p>
+      </div>
+    </div>
+
+    <div class="flex items-center space-x-4 text-xs font-mono">
+      <div class="flex items-center space-x-2 bg-slate-900 border border-quant-border px-3 py-1.5 rounded-lg">
+        <span class="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" id="status-bolinha"></span>
+        <span id="status-mercado" class="text-slate-300 font-semibold">SINCRONIZANDO...</span>
+      </div>
+      <button onclick="carregarDados()" id="btn-atualizar" class="flex items-center space-x-1.5 bg-blue-600 hover:bg-blue-500 text-white font-sans px-3 py-1.5 rounded-lg transition active:scale-95">
+        <i data-lucide="refresh-cw" class="w-3.5 h-3.5" id="icone-refresh"></i>
+        <span>Atualizar</span>
+      </button>
+    </div>
+  </header>
+
+  <div class="flex-1 flex flex-col lg:flex-row overflow-hidden">
+    <!-- SIDEBAR -->
+    <aside class="w-full lg:w-96 border-b lg:border-b-0 lg:border-r border-quant-border bg-quant-card/40 p-5 space-y-6 overflow-y-auto max-h-screen">
+      <div>
+        <h2 class="text-sm font-bold text-white flex items-center gap-2 uppercase tracking-wider">
+          <i data-lucide="zap" class="w-4 h-4 text-amber-400"></i> Radar de Agilidade B3
+        </h2>
+        <p class="text-xs text-slate-400 mt-1">Escaneamento Contínuo dos 21 Ativos</p>
+      </div>
+
+      <div class="grid grid-cols-2 gap-3">
+        <div class="bg-quant-card border border-quant-border p-3 rounded-lg text-center">
+          <span class="text-xs text-slate-400 block font-medium">Armadas Hoje</span>
+          <span class="text-2xl font-bold font-mono text-emerald-400" id="sidebar-armadas">🎯 0</span>
+        </div>
+        <div class="bg-quant-card border border-quant-border p-3 rounded-lg text-center">
+          <span class="text-xs text-slate-400 block font-medium">À Caminho</span>
+          <span class="text-2xl font-bold font-mono text-amber-400" id="sidebar-caminho">⏳ 0</span>
+        </div>
+      </div>
+
+      <div class="space-y-2">
+        <div class="flex items-center justify-between">
+          <span class="text-xs font-semibold text-slate-300 uppercase tracking-wider">Grid Operacional</span>
+          <span class="text-[11px] text-slate-500 font-mono" id="sidebar-total-ativos">21 papéis</span>
+        </div>
+        <div class="border border-quant-border rounded-lg overflow-hidden bg-slate-900/60 max-h-80 overflow-y-auto">
+          <table class="w-full text-left text-xs font-mono">
+            <thead class="bg-slate-900 text-slate-400 uppercase text-[10px] border-b border-quant-border sticky top-0">
+              <tr>
+                <th class="px-3 py-2">Ticker</th>
+                <th class="px-3 py-2">Status</th>
+                <th class="px-3 py-2 text-right">Preço</th>
+                <th class="px-3 py-2 text-right">IFR-2</th>
+              </tr>
+            </thead>
+            <tbody id="sidebar-tabela-corpo" class="divide-y divide-quant-border/50"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <hr class="border-quant-border">
+
+      <div class="space-y-2">
+        <label for="select-ativo" class="text-xs font-semibold text-slate-300 flex items-center gap-1.5 uppercase tracking-wider">
+          <i data-lucide="search" class="w-3.5 h-3.5 text-blue-400"></i> Ativo Selecionado:
+        </label>
+        <select id="select-ativo" onchange="selecionarAtivo(this.value)" class="w-full bg-slate-900 border border-quant-border rounded-lg px-3 py-2 text-sm text-white font-mono focus:outline-none focus:border-blue-500"></select>
+      </div>
+
+      <div class="space-y-2 bg-slate-900/40 border border-quant-border p-3.5 rounded-lg">
+        <div class="flex justify-between items-center text-xs">
+          <span class="text-slate-300 font-medium">Alvo de Ganho Explosivo:</span>
+          <span id="valor-slider-alvo" class="text-blue-400 font-bold font-mono">+150%</span>
+        </div>
+        <input type="range" id="slider-alvo" min="1.0" max="3.0" step="0.25" value="1.5" oninput="atualizarMultiplicadorAlvo(this.value)" class="w-full accent-blue-500 cursor-pointer">
+        <div class="flex justify-between text-[10px] text-slate-500 font-mono">
+          <span>+100% (2.0x)</span>
+          <span>+200%</span>
+          <span>+300% (4.0x)</span>
+        </div>
+      </div>
+    </aside>
+
+    <!-- PAINEL PRINCIPAL -->
+    <main class="flex-1 p-6 space-y-6 overflow-y-auto">
+      <section class="grid grid-cols-2 sm:grid-cols-4 gap-4">
+        <div class="bg-quant-card border border-quant-border p-4 rounded-xl">
+          <span class="text-xs text-slate-400 uppercase tracking-wider font-medium">Ativo</span>
+          <p class="text-2xl font-bold font-mono text-white mt-1" id="card-ativo">--</p>
+        </div>
+        <div class="bg-quant-card border border-quant-border p-4 rounded-xl">
+          <span class="text-xs text-slate-400 uppercase tracking-wider font-medium">Último Preço</span>
+          <p class="text-2xl font-bold font-mono text-white mt-1" id="card-preco">R$ --</p>
+        </div>
+        <div class="bg-quant-card border border-quant-border p-4 rounded-xl">
+          <span class="text-xs text-slate-400 uppercase tracking-wider font-medium">Regime Macro (MME 200)</span>
+          <p class="text-lg font-bold font-mono mt-1" id="card-regime">--</p>
+        </div>
+        <div class="bg-quant-card border border-quant-border p-4 rounded-xl">
+          <span class="text-xs text-slate-400 uppercase tracking-wider font-medium">Status Operacional</span>
+          <p class="text-base font-bold font-mono mt-1 truncate" id="card-status">--</p>
+        </div>
+      </section>
+
+      <!-- Grade 5 Strikes -->
+      <section class="bg-quant-card border border-quant-border rounded-xl p-5 shadow-xl space-y-4">
+        <div id="banner-vencimento" class="p-3 rounded-lg border flex items-center justify-between text-xs font-sans"></div>
+        <div class="overflow-x-auto">
+          <table class="w-full text-left text-xs font-mono">
+            <thead class="bg-slate-900/80 text-slate-400 uppercase text-[11px] border-b border-quant-border">
+              <tr>
+                <th class="px-4 py-2.5">Destaque</th>
+                <th class="px-4 py-2.5">Código B3</th>
+                <th class="px-4 py-2.5">Strike</th>
+                <th class="px-4 py-2.5">Distância (%)</th>
+                <th class="px-4 py-2.5">Moneyness</th>
+                <th class="px-4 py-2.5">Delta</th>
+                <th class="px-4 py-2.5">Prêmio Est.</th>
+                <th class="px-4 py-2.5 text-right font-bold text-blue-400" id="th-alvo">Alvo (+150%)</th>
+              </tr>
+            </thead>
+            <tbody id="tabela-strikes-corpo" class="divide-y divide-quant-border"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- Abas -->
+      <section class="space-y-4">
+        <div class="flex border-b border-quant-border space-x-2 text-sm">
+          <button onclick="mudarAba('graficos')" id="tab-btn-graficos" class="px-4 py-2 font-semibold text-blue-400 border-b-2 border-blue-500 flex items-center gap-2">
+            <i data-lucide="line-chart" class="w-4 h-4"></i> Gráficos Interativos
+          </button>
+          <button onclick="mudarAba('trades')" id="tab-btn-trades" class="px-4 py-2 font-semibold text-slate-400 hover:text-slate-200 flex items-center gap-2">
+            <i data-lucide="clipboard-list" class="w-4 h-4"></i> Histórico de Operações
+          </button>
+          <button onclick="mudarAba('ranking')" id="tab-btn-ranking" class="px-4 py-2 font-semibold text-slate-400 hover:text-slate-200 flex items-center gap-2">
+            <i data-lucide="trophy" class="w-4 h-4"></i> Ranking da Carteira
+          </button>
+        </div>
+
+        <div id="aba-graficos" class="bg-quant-card border border-quant-border rounded-xl p-4 shadow-xl">
+          <div class="flex justify-between items-center mb-2 px-2">
+            <h3 class="text-xs font-semibold text-slate-300 uppercase tracking-wider flex items-center gap-2" id="titulo-grafico">
+              Análise Técnica: PETR4
+            </h3>
+            <span class="text-[11px] text-slate-500 font-mono">Candles Diários, MME 200 & Oscilador IFR-2</span>
+          </div>
+          <div id="plotly-chart" class="w-full" style="height: 580px;"></div>
+        </div>
+
+        <div id="aba-trades" class="hidden bg-quant-card border border-quant-border rounded-xl p-5 shadow-xl space-y-4">
+          <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            <div class="bg-slate-900 border border-quant-border p-3 rounded-lg text-center">
+              <span class="text-xs text-slate-400 block font-medium">Total de Trades</span>
+              <span class="text-xl font-bold font-mono text-white" id="hist-total">18</span>
+            </div>
+            <div class="bg-slate-900 border border-quant-border p-3 rounded-lg text-center">
+              <span class="text-xs text-slate-400 block font-medium">Vitórias (+150%)</span>
+              <span class="text-xl font-bold font-mono text-emerald-400" id="hist-vitorias">11</span>
+            </div>
+            <div class="bg-slate-900 border border-quant-border p-3 rounded-lg text-center">
+              <span class="text-xs text-slate-400 block font-medium">Taxa de Acerto</span>
+              <span class="text-xl font-bold font-mono text-blue-400" id="hist-acerto">61.1%</span>
+            </div>
+            <div class="bg-slate-900 border border-quant-border p-3 rounded-lg text-center">
+              <span class="text-xs text-slate-400 block font-medium">Retorno Total</span>
+              <span class="text-xl font-bold font-mono text-emerald-400" id="hist-retorno">+142.5%</span>
+            </div>
+          </div>
+          <div class="overflow-x-auto">
+            <table class="w-full text-left text-xs font-mono">
+              <thead class="bg-slate-900 text-slate-400 uppercase text-[10px] border-b border-quant-border">
+                <tr>
+                  <th class="px-4 py-2">Data Entrada</th>
+                  <th class="px-4 py-2">Direção</th>
+                  <th class="px-4 py-2">Preço Ação</th>
+                  <th class="px-4 py-2">Prêmio Pago</th>
+                  <th class="px-4 py-2">Alvo Saída</th>
+                  <th class="px-4 py-2 text-right">Resultado</th>
+                </tr>
+              </thead>
+              <tbody id="tabela-historico-corpo" class="divide-y divide-quant-border"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <div id="aba-ranking" class="hidden bg-quant-card border border-quant-border rounded-xl p-5 shadow-xl space-y-4">
+          <div class="flex items-center justify-between">
+            <h3 class="text-xs font-bold text-white uppercase tracking-wider">Performance Consolidada da Carteira B3 (Backtest Histórico)</h3>
+            <span class="text-xs text-slate-400 font-mono">2023 - 2026</span>
+          </div>
+          <div class="overflow-x-auto">
+            <table class="w-full text-left text-xs font-mono">
+              <thead class="bg-slate-900 text-slate-400 uppercase text-[11px] border-b border-quant-border">
+                <tr>
+                  <th class="px-4 py-2.5">Ticker</th>
+                  <th class="px-4 py-2.5 text-right">Ret. Total (%)</th>
+                  <th class="px-4 py-2.5 text-right">Ret. CALL (%)</th>
+                  <th class="px-4 py-2.5 text-right">Ret. PUT (%)</th>
+                  <th class="px-4 py-2.5 text-right">Taxa CALL (%)</th>
+                  <th class="px-4 py-2.5 text-right">Taxa PUT (%)</th>
+                </tr>
+              </thead>
+              <tbody id="tabela-ranking-corpo" class="divide-y divide-quant-border"></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
