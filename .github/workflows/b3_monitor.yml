@@ -2,8 +2,8 @@ name: B3 Triple Screen Monitor
 
 on:
   schedule:
-    # Executa a cada 30 minutos entre 13:00 e 20:59 UTC (10:00 às 17:59 BRT), de segunda a sexta-feira
-    - cron: '*/30 13-20 * * 1-5'
+    # Executa a cada 30 minutos entre 13:00 e 21:59 UTC (10:00 às 18:59 BRT), de segunda a sexta-feira
+    - cron: '*/30 13-21 * * 1-5'
   workflow_dispatch:
 
 jobs:
@@ -27,6 +27,7 @@ jobs:
 
       - name: Executar monitoramento B3 em tempo real
         env:
+          TZ: "America/Sao_Paulo"
           WEBHOOK_URL: ${{ secrets.WEBHOOK_URL }}
         run: |
           python monitor_realtime.py

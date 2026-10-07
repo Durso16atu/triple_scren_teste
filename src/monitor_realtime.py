@@ -8,6 +8,7 @@ import time
 import json
 import argparse
 from datetime import datetime, time as dtime
+from zoneinfo import ZoneInfo
 from dataclasses import dataclass, asdict
 from typing import Dict, Any, Optional, List
 import pandas as pd
@@ -15,11 +16,19 @@ import yfinance as yf
 import os
 import requests
 
+try:
+    from src.webhook_dispatcher import WebhookDispatcher
+except ImportError:
+    from webhook_dispatcher import WebhookDispatcher
+
+# Fuso horário oficial da B3
+TZ_SP = ZoneInfo("America/Sao_Paulo")
+
 # ------------------------------------------------------------------------------
 # 1. PARÂMETROS E GUARDRAILS DE NEGÓCIO
 # ------------------------------------------------------------------------------
 HORA_INICIO_PREGAO = dtime(10, 0)
-HORA_FIM_PREGAO = dtime(16, 30)
+HORA_FIM_PREGAO = dtime(17, 0)
 PAYOFF_ALVO = 2.0
 RISCO_MAX_PCT = 0.07
 RISCO_MIN_REAIS = 0.15
@@ -129,7 +138,7 @@ def checar_price_action(candle: pd.Series, candle_ant: Optional[pd.Series], tipo
     return False
 
 def determinar_ticker_opcao(ticker_ativo: str, strike_alvo: float, tipo: str) -> str:
-    hoje = datetime.now()
+    hoje = datetime.now(TZ_SP)
     mes_venc = hoje.month if hoje.day <= 10 else (hoje.month % 12) + 1
     tabela = LETRAS_CALL if tipo == "CALL" else LETRAS_PUT
     letra = tabela.get(mes_venc, 'A' if tipo == "CALL" else 'M')
@@ -228,14 +237,21 @@ class SubAgenteReviewer:
 # 4. ORQUESTRADOR E SINCRONIZAÇÃO
 # ------------------------------------------------------------------------------
 class MonitorRealtimeB3:
-    def __init__(self, cesta: List[str]):
+    def __init__(self, cesta: List[str], webhook: Optional[WebhookDispatcher] = None):
         self.cesta = cesta
         self.creator = SubAgenteCreator()
         self.reviewer = SubAgenteReviewer(GuardrailsAtuariais())
+        self.webhook = webhook or WebhookDispatcher()
 
     def executar_ciclo(self):
-        agora = datetime.now()
-        print(f"\n[{agora.strftime('%Y-%m-%d %H:%M:%S')}] Iniciando varredura em {len(self.cesta)} ativos B3...")
+        agora_sp = datetime.now(TZ_SP)
+        ts_formatado = agora_sp.strftime("%Y-%m-%d %H:%M:%S")
+
+        eh_dia_util = agora_sp.weekday() < 5
+        eh_horario_pregao = dtime(10, 0) <= agora_sp.time() <= dtime(17, 0)
+        status_str = "ABERTO" if (eh_dia_util and eh_horario_pregao) else "FECHADO"
+
+        print(f"\n[{ts_formatado}] Iniciando varredura em {len(self.cesta)} ativos B3 (Mercado: {status_str})...")
         oportunidades = []
 
         for ticker in self.cesta:
@@ -252,14 +268,21 @@ class MonitorRealtimeB3:
             except Exception as e:
                 continue
 
+        total_armados = len(oportunidades)
+        total_ativados = sum(
+            1 for p in oportunidades
+            if (p.tipo_operacao == "CALL" and p.preco_ativo >= p.gatilho_ordem)
+            or (p.tipo_operacao == "PUT" and p.preco_ativo <= p.gatilho_ordem)
+        )
+
         # Monta o payload estruturado (Contrato de Dados da Etapa 1)
         payload = {
             "metadata": {
                 "pipeline_version": "1.2.0",
-                "timestamp_execucao": agora.isoformat(),
+                "timestamp_execucao": agora_sp.isoformat(),
                 "total_cesta": len(self.cesta),
                 "total_sinais": len(oportunidades),
-                "status_mercado": "ABERTO" if (HORA_INICIO_PREGAO <= agora.time() <= HORA_FIM_PREGAO) else "FECHADO"
+                "status_mercado": status_str
             },
             "sinais_ativos": [asdict(p) for p in oportunidades]
         }
@@ -268,13 +291,18 @@ class MonitorRealtimeB3:
         with open("metricas_resumo.json", "w", encoding="utf-8") as f:
             json.dump(payload, f, ensure_ascii=False, indent=2)
 
-        # 2. Sincroniza via Webhook com o Google Sheets (Camada 2)
-        self.sincronizar_google_sheets(payload)
+        # 2. Sincroniza via Webhook com o Google Sheets se houver oportunidades
+        if oportunidades:
+            self.sincronizar_google_sheets(payload)
+
+        # 3. Telemetria e Heartbeat garantido ao final de toda execução
+        self.webhook.enviar_heartbeat(status_str, total_armados, total_ativados, ts_formatado)
 
     def sincronizar_google_sheets(self, payload: dict):
         try:
             print("[*] Enviando dados para o Google Sheets via Webhook...")
-            response = requests.post(URL_WEBHOOK_SHEETS, json=payload, timeout=15)
+            target_url = self.webhook.webhook_url if hasattr(self, 'webhook') and self.webhook else URL_WEBHOOK_SHEETS
+            response = requests.post(target_url, json=payload, timeout=15)
             if response.status_code == 200:
                 print(f"[OK] Sincronização Google Sheets concluída com sucesso! ({response.text})")
             else:
