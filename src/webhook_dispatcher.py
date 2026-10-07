@@ -92,3 +92,4 @@ class WebhookDispatcher:
         except Exception as e:
             print(f"[ERRO] Falha ao enviar payload para o Webhook: {e}")
             return False
+

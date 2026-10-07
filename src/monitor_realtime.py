@@ -21,6 +21,21 @@ try:
 except ImportError:
     from webhook_dispatcher import WebhookDispatcher
 
+try:
+    from src.black_scholes_engine import (
+        BlackScholesEngine,
+        strike_oficial_b3,
+        obter_vencimento_mensal_alvo,
+        calcular_terceira_sexta
+    )
+except ImportError:
+    from black_scholes_engine import (
+        BlackScholesEngine,
+        strike_oficial_b3,
+        obter_vencimento_mensal_alvo,
+        calcular_terceira_sexta
+    )
+
 # Fuso horário oficial da B3
 TZ_SP = ZoneInfo("America/Sao_Paulo")
 
@@ -51,12 +66,12 @@ LETRAS_PUT  = {1: 'M', 2: 'N', 3: 'O', 4: 'P', 5: 'Q', 6: 'R', 7: 'S', 8: 'T', 9
 
 @dataclass
 class GuardrailsAtuariais:
-    premio_min: float = 0.15
-    premio_max: float = 0.25
-    delta_min: float = 0.15
-    delta_max: float = 0.25
-    gamma_min: float = 0.05
-    theta_pct_max: float = 0.05
+    premio_min: float = 0.05
+    premio_max: float = 5.00
+    delta_min: float = 0.05
+    delta_max: float = 0.70
+    gamma_min: float = 0.005
+    theta_pct_max: float = 0.15
     dte_min: int = 15
 
 @dataclass
@@ -76,6 +91,7 @@ class PropostaTrade:
     gamma_estimado: float
     theta_pct_estimado: float
     dte_dias_uteis: int
+    grade_opcoes: Optional[List[Dict[str, Any]]] = None
 
 # ------------------------------------------------------------------------------
 # 2. INGESTÃO E CÁLCULO DAS TELAS
@@ -138,16 +154,21 @@ def checar_price_action(candle: pd.Series, candle_ant: Optional[pd.Series], tipo
     return False
 
 def determinar_ticker_opcao(ticker_ativo: str, strike_alvo: float, tipo: str) -> str:
-    hoje = datetime.now(TZ_SP)
-    mes_venc = hoje.month if hoje.day <= 10 else (hoje.month % 12) + 1
-    tabela = LETRAS_CALL if tipo == "CALL" else LETRAS_PUT
-    letra = tabela.get(mes_venc, 'A' if tipo == "CALL" else 'M')
-    return f"{ticker_ativo[:4]}{letra}{int(round(strike_alvo))}"
+    strike_oficial = strike_oficial_b3(strike_alvo, passo=1.0)
+    raiz = ticker_ativo.replace(".SA", "")[:4]
+    vencimento, _ = obter_vencimento_mensal_alvo()
+    mes_venc = vencimento.month
+    tabela = LETRAS_CALL if tipo.upper() == "CALL" else LETRAS_PUT
+    letra = tabela.get(mes_venc, 'K' if tipo.upper() == "CALL" else 'W')
+    return f"{raiz}{letra}{int(round(strike_oficial))}"
 
 # ------------------------------------------------------------------------------
 # 3. MAKER-CHECKER (CREATOR E REVIEWER)
 # ------------------------------------------------------------------------------
 class SubAgenteCreator:
+    def __init__(self, bs_engine: Optional[BlackScholesEngine] = None):
+        self.bs_engine = bs_engine or BlackScholesEngine(risk_free_rate=0.1075)
+
     def avaliar_ativo(self, ticker: str, df_d: pd.DataFrame, df_60: pd.DataFrame, df_15: pd.DataFrame) -> Optional[PropostaTrade]:
         df_d_ind = calcular_indicadores_diario(df_d)
         t1 = df_d_ind.iloc[-1]
@@ -195,24 +216,46 @@ class SubAgenteCreator:
         if risco < RISCO_MIN_REAIS or risco > (gatilho * RISCO_MAX_PCT):
             return None
 
-        ticker_op = determinar_ticker_opcao(ticker, alvo, tipo)
+        strike_op = strike_oficial_b3(alvo, passo=1.0)
+        ticker_op = determinar_ticker_opcao(ticker, strike_op, tipo)
+
+        # Recálculo Dinâmico dos Prêmios Black-Scholes e DTE
+        _, dte_uteis = obter_vencimento_mensal_alvo()
+        vol = self.bs_engine.calculate_historical_volatility(df_d['Close'])
+        spot_price = float(candle_15['Close'])
+
+        greeks = self.bs_engine.evaluate_option(
+            spot=spot_price,
+            strike=strike_op,
+            dte_business_days=dte_uteis,
+            option_type=tipo,
+            sigma=vol
+        )
+
+        df_grade, _, _ = self.bs_engine.gerar_grade_5_strikes(
+            ticker=ticker,
+            spot=spot_price,
+            sigma=vol,
+            tipo=tipo
+        )
 
         return PropostaTrade(
             ticker_ativo=ticker,
             data_hora=df_15.index[-1].strftime("%Y-%m-%d %H:%M"),
             tipo_operacao=tipo,
-            preco_ativo=float(candle_15['Close']),
+            preco_ativo=spot_price,
             gatilho_ordem=round(gatilho, 2),
             stop_loss_macro=round(stop, 2),
             alvo_2r=round(alvo, 2),
             risco_r=round(risco, 2),
             ticker_opcao_sugerida=ticker_op,
-            strike_opcao=round(alvo, 2),
-            premio_referencia=0.20,
-            delta_estimado=0.22 if tipo == "CALL" else -0.22,
-            gamma_estimado=0.065,
-            theta_pct_estimado=0.035,
-            dte_dias_uteis=18
+            strike_opcao=strike_op,
+            premio_referencia=round(greeks["theoretical_price"], 2),
+            delta_estimado=round(greeks["delta"], 4),
+            gamma_estimado=round(greeks["gamma"], 4),
+            theta_pct_estimado=round(abs(greeks["theta_pct"]), 4),
+            dte_dias_uteis=dte_uteis,
+            grade_opcoes=df_grade.to_dict(orient="records")
         )
 
 class SubAgenteReviewer:
@@ -253,6 +296,8 @@ class MonitorRealtimeB3:
 
         print(f"\n[{ts_formatado}] Iniciando varredura em {len(self.cesta)} ativos B3 (Mercado: {status_str})...")
         oportunidades = []
+        grades_ativas = {}
+        venc_alvo, dte_uteis = obter_vencimento_mensal_alvo()
 
         for ticker in self.cesta:
             try:
@@ -261,10 +306,22 @@ class MonitorRealtimeB3:
                 df_15 = baixar_serie(ticker, "5d", "15m")
                 if df_d.empty or df_60.empty or df_15.empty:
                     continue
+
+                # Recalcula a grade de opções com preços atuais do yfinance em cada ciclo
+                spot_ticker = float(df_15['Close'].iloc[-1])
+                vol_ticker = self.creator.bs_engine.calculate_historical_volatility(df_d['Close'])
+                df_g, _, _ = self.creator.bs_engine.gerar_grade_5_strikes(
+                    ticker=ticker,
+                    spot=spot_ticker,
+                    sigma=vol_ticker,
+                    tipo="CALL"
+                )
+                grades_ativas[ticker] = df_g.to_dict(orient="records")
+
                 p = self.creator.avaliar_ativo(ticker, df_d, df_60, df_15)
                 if p and self.reviewer.auditar(p)["aprovado"]:
                     oportunidades.append(p)
-                    print(f"  -> SINAL CONFIRMADO: {p.ticker_ativo} ({p.tipo_operacao}) | Opção: {p.ticker_opcao_sugerida}")
+                    print(f"  -> SINAL CONFIRMADO: {p.ticker_ativo} ({p.tipo_operacao}) | Opção: {p.ticker_opcao_sugerida} | Prêmio: R$ {p.premio_referencia:.2f}")
             except Exception as e:
                 continue
 
@@ -275,25 +332,35 @@ class MonitorRealtimeB3:
             or (p.tipo_operacao == "PUT" and p.preco_ativo <= p.gatilho_ordem)
         )
 
+        grade_opcoes_ciclo = []
+        if oportunidades and oportunidades[0].grade_opcoes:
+            grade_opcoes_ciclo = oportunidades[0].grade_opcoes
+        elif grades_ativas:
+            primeiro_ticker = next((t for t in ["ITUB4.SA", "PETR4.SA", "BOVA11.SA"] if t in grades_ativas), next(iter(grades_ativas.keys())))
+            grade_opcoes_ciclo = grades_ativas[primeiro_ticker]
+
         # Monta o payload estruturado (Contrato de Dados da Etapa 1)
         payload = {
             "metadata": {
-                "pipeline_version": "1.2.0",
+                "pipeline_version": "1.3.0",
                 "timestamp_execucao": agora_sp.isoformat(),
                 "total_cesta": len(self.cesta),
                 "total_sinais": len(oportunidades),
-                "status_mercado": status_str
+                "status_mercado": status_str,
+                "vencimento_alvo": venc_alvo.strftime("%d/%m/%Y"),
+                "dte_dias_uteis": dte_uteis
             },
-            "sinais_ativos": [asdict(p) for p in oportunidades]
+            "sinais_ativos": [asdict(p) for p in oportunidades],
+            "grade_opcoes": grade_opcoes_ciclo,
+            "grades_por_ativo": grades_ativas
         }
 
         # 1. Salva cópia local (metricas_resumo.json)
         with open("metricas_resumo.json", "w", encoding="utf-8") as f:
             json.dump(payload, f, ensure_ascii=False, indent=2)
 
-        # 2. Sincroniza via Webhook com o Google Sheets se houver oportunidades
-        if oportunidades:
-            self.sincronizar_google_sheets(payload)
+        # 2. Sincroniza via Webhook com o Google Sheets em cada ciclo
+        self.sincronizar_google_sheets(payload)
 
         # 3. Telemetria e Heartbeat garantido ao final de toda execução
         self.webhook.enviar_heartbeat(status_str, total_armados, total_ativados, ts_formatado)
@@ -301,7 +368,7 @@ class MonitorRealtimeB3:
     def sincronizar_google_sheets(self, payload: dict):
         try:
             print("[*] Enviando dados para o Google Sheets via Webhook...")
-            target_url = self.webhook.webhook_url if hasattr(self, 'webhook') and self.webhook else URL_WEBHOOK_SHEETS
+            target_url = getattr(self.webhook, "webhook_url", None) or URL_WEBHOOK_SHEETS
             response = requests.post(target_url, json=payload, timeout=15)
             if response.status_code == 200:
                 print(f"[OK] Sincronização Google Sheets concluída com sucesso! ({response.text})")
