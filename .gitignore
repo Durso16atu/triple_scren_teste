@@ -16,3 +16,4 @@ data/
 *.csv
 *.parquet
 *.bin
+metricas_resumo.json
