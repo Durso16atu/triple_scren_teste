@@ -21,14 +21,36 @@ async function carregarDados() {
   try {
     const res = await fetch(API_URL + "?t=" + Date.now());
     const dados = await res.json();
+    
+    let payloadValido = true;
+    
+    // Blindagem de integridade atuarial
+    if (dados.metadata && dados.metadata.dte_dias_uteis && dados.metadata.dte_dias_uteis !== 29) {
+       payloadValido = false;
+    }
+    
+    if (dados.grades_por_ativo) {
+       for (const ticker in dados.grades_por_ativo) {
+          const grade = dados.grades_por_ativo[ticker];
+          for (const opt of grade) {
+             if (opt["Prêmio Est."] === 0.67 || opt["DTE (Dias Úteis)"] !== 29) {
+                 payloadValido = false;
+                 break;
+             }
+          }
+          if (!payloadValido) break;
+       }
+    }
 
-    if (dados.status === "sucesso") {
+    if (dados.status === "sucesso" && payloadValido) {
       estado.dadosAPI = dados;
       processarDadosMercado(dados);
     } else {
+      console.warn("Payload atuarial rejeitado pela blindagem (mock legados detectados). Acionando fallback JS.");
       gerarDadosFallback();
     }
   } catch (err) {
+    console.error(err);
     gerarDadosFallback();
   } finally {
     if (icone) icone.classList.remove("animate-spin");
