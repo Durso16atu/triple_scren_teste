@@ -112,3 +112,29 @@ if __name__ == "__main__":
         venc, dte = obter_vencimento_mensal_alvo(data_base=data_base, dte_minimo=15)
         self.assertEqual(venc, datetime.date(2026, 11, 20))
         self.assertEqual(dte, 29)
+
+    def test_premios_desgenerificados(self):
+        # CMIG4 ~ 11.88, Vol ~ 28% (0.28)
+        df_cmig, _, _ = self.bs.gerar_grade_5_strikes(
+            ticker="CMIG4",
+            spot=11.88,
+            sigma=0.28,
+            tipo="CALL",
+            data_base=datetime.date(2026, 10, 8) # 29 DU
+        )
+        # O strike ATM seria o strike_oficial_b3(11.88, 0.50) => 12.00
+        atm_row_cmig = df_cmig[df_cmig["Strike"] == 12.00].iloc[0]
+        premio_cmig = atm_row_cmig["Prêmio Est."]
+        self.assertTrue(0.40 <= premio_cmig <= 0.55, f"Prêmio CMIG4 {premio_cmig} fora da faixa 0.40-0.55")
+
+        # PRIO3 ~ 42.80, Vol ~ 38% (0.38)
+        df_prio, _, _ = self.bs.gerar_grade_5_strikes(
+            ticker="PRIO3",
+            spot=42.80,
+            sigma=0.38,
+            tipo="CALL",
+            data_base=datetime.date(2026, 10, 8) # 29 DU
+        )
+        atm_row_prio = df_prio[df_prio["Strike"] == 43.00].iloc[0]
+        premio_prio = atm_row_prio["Prêmio Est."]
+        self.assertTrue(1.80 <= premio_prio <= 2.40, f"Prêmio PRIO3 {premio_prio} fora da faixa 1.80-2.40")

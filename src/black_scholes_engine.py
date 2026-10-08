@@ -205,13 +205,20 @@ class BlackScholesEngine:
         spot: float,
         sigma: float,
         tipo: str = "CALL",
-        passo_strike: float = 1.0,
+        passo_strike: Optional[float] = None,
         data_base: Optional[date] = None
     ) -> Tuple[pd.DataFrame, date, int]:
         """
         Gera a grade oficial de 5 strikes (-6% ITM, -3% ITM, ATM, +3% OTM, +6% OTM)
         com strikes arredondados pela grade B3 e prêmios/gregas recalculados via Black-Scholes.
         """
+        if passo_strike is None:
+            if spot < 20.0:
+                passo_strike = 0.50
+            elif spot <= 50.0:
+                passo_strike = 1.00
+            else:
+                passo_strike = 2.00
         vencimento, dias_uteis = obter_vencimento_mensal_alvo(data_base)
         mes_venc = vencimento.month
         raiz = ticker.replace(".SA", "")[:4]

@@ -302,6 +302,7 @@ class MonitorRealtimeB3:
         print(f"\n[{ts_formatado}] Iniciando varredura em {len(self.cesta)} ativos B3 (Mercado: {status_str})...")
         oportunidades = []
         grades_ativas = {}
+        precos_spot = {}
         venc_alvo, dte_uteis = obter_vencimento_mensal_alvo()
 
         for ticker in self.cesta:
@@ -322,6 +323,7 @@ class MonitorRealtimeB3:
                     tipo="CALL"
                 )
                 grades_ativas[ticker] = df_g.to_dict(orient="records")
+                precos_spot[ticker] = spot_ticker
 
                 p = self.creator.avaliar_ativo(ticker, df_d, df_60, df_15)
                 if p and self.reviewer.auditar(p)["aprovado"]:
@@ -357,7 +359,8 @@ class MonitorRealtimeB3:
             },
             "sinais_ativos": [asdict(p) for p in oportunidades],
             "grade_opcoes": grade_opcoes_ciclo,
-            "grades_por_ativo": grades_ativas
+            "grades_por_ativo": grades_ativas,
+            "precos_spot": precos_spot
         }
 
         # 1. Salva cópia local (metricas_resumo.json)

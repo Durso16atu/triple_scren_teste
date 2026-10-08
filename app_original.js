@@ -37,63 +37,52 @@ async function carregarDados() {
 }
 
 function processarDadosMercado(dados) {
-  const statusMercado = (dados.metadata && dados.metadata.status_mercado) || (dados.kpis && dados.kpis["Status do Mercado"]) || "ABERTO";
+  const statusMercado = (dados.kpis && dados.kpis["Status do Mercado"]) || "ABERTO";
   document.getElementById("status-mercado").textContent = `PREGÃO ${statusMercado}`;
 
   TICKERS_B3.forEach((t, i) => {
     const tickerLimpo = t.replace(".SA", "");
     const sinalReal = dados.sinais_ativos ? dados.sinais_ativos.find(s => s.ticker_ativo.includes(tickerLimpo)) : null;
-    
-    // Pegar as grades e o preco spot
-    let gradeOpcoes = [];
-    if (dados.grades_por_ativo && dados.grades_por_ativo[t]) {
-      gradeOpcoes = dados.grades_por_ativo[t];
-    }
-    let precoSpot = 20.0;
-    if (dados.precos_spot && dados.precos_spot[t]) {
-      precoSpot = dados.precos_spot[t];
-    }
 
     if (sinalReal) {
       estado.radar[tickerLimpo] = {
         ticker: tickerLimpo,
         status: sinalReal.tipo_operacao === "CALL" ? "🚀 CALL ARMADA!" : "🔻 PUT ARMADA!",
-        preco: Number(sinalReal.preco_ativo) || precoSpot,
+        preco: Number(sinalReal.preco_ativo) || 44.31,
         ifr2: sinalReal.tipo_operacao === "CALL" ? 14.2 : 86.4,
         regime_bull: sinalReal.tipo_operacao === "CALL",
         tipo: sinalReal.tipo_operacao,
         prioridade: 1,
-        sinal: sinalReal,
-        grade_opcoes: gradeOpcoes
+        sinal: sinalReal
       };
     } else {
+      const basePrecos = {
+        "PETR4": 36.50, "VALE3": 58.20, "BOVA11": 128.50, "BBAS3": 27.40,
+        "WEGE3": 54.10, "B3SA3": 11.20, "PRIO3": 42.80, "ITUB4": 44.31
+      };
+      const precoBase = basePrecos[tickerLimpo] || (20 + (i * 3.7) % 35);
       const isBull = i % 2 === 0;
 
       estado.radar[tickerLimpo] = {
         ticker: tickerLimpo,
         status: isBull && i === 2 ? "🟡 À CAMINHO (CALL)" : (!isBull && i === 5 ? "🟠 À CAMINHO (PUT)" : "⚪ Neutro"),
-        preco: precoSpot,
+        preco: precoBase,
         ifr2: isBull && i === 2 ? 18.5 : (!isBull && i === 5 ? 82.1 : 48.0),
         regime_bull: isBull,
         tipo: isBull ? "CALL" : "PUT",
         prioridade: isBull && i === 2 ? 3 : (!isBull && i === 5 ? 4 : 5),
-        sinal: null,
-        grade_opcoes: gradeOpcoes
+        sinal: null
       };
     }
   });
 
   if (dados.sinais_ativos && dados.sinais_ativos.length > 0) {
-    const primeiro = dados.sinais_ativos[0].ticker_ativo.replace(".SA", "");
-    if (estado.radar[primeiro]) {
-      estado.ativoSelecionado = primeiro;
-    }
+    estado.ativoSelecionado = dados.sinais_ativos[0].ticker_ativo.replace(".SA", "");
   }
 }
 
-
 function gerarDadosFallback() {
-  processarDadosMercado({ metadata: { status_mercado: "ABERTO" }, sinais_ativos: [] });
+  processarDadosMercado({ kpis: { "Status do Mercado": "ABERTO" }, sinais_ativos: [] });
 }
 
 function renderizarSidebar() {
@@ -185,18 +174,10 @@ function renderizarPainelPrincipal() {
 function renderizarGradeStrikes() {
   const info = estado.radar[estado.ativoSelecionado];
   const preco = info.preco;
-  
-  // Pegar os dados da grade do backend
-  let gradeBackend = info.grade_opcoes || [];
-  
   const isCall = info.tipo === "CALL";
-  let diasUteis = 18;
-  let dataVenc = "20/11/2026";
-  
-  if (gradeBackend.length > 0) {
-     diasUteis = gradeBackend[0]["DTE (Dias Úteis)"];
-     dataVenc = gradeBackend[0]["Vencimento"];
-  }
+  const letraVenc = isCall ? "K" : "W";
+  const diasUteis = 18;
+  const dataVenc = "20/11/2026";
 
   const banner = document.getElementById("banner-vencimento");
   if (info.status.includes("ARMADA")) {
@@ -210,44 +191,32 @@ function renderizarGradeStrikes() {
     banner.innerHTML = `<span>ℹ️ <strong>Ativo Neutro:</strong> Grade Teórica de Strikes para Estudo (${info.tipo})</span> <span class="font-mono">Vencimento: ${dataVenc} (${diasUteis} DU)</span>`;
   }
 
+  const deltas = isCall ? [0.65, 0.50, 0.38, 0.22, 0.12] : [-0.65, -0.50, -0.38, -0.22, -0.12];
+  const offsets = [-2, -1, 0, 1, 2];
   const tbody = document.getElementById("tabela-strikes-corpo");
   tbody.innerHTML = "";
 
-  if (gradeBackend.length === 0) {
-      tbody.innerHTML = "<tr><td colspan='9' class='text-center py-4 text-slate-500'>Aguardando dados da B3...</td></tr>";
-      return;
-  }
-
-  gradeBackend.forEach((opt, idx) => {
-    const destaque = opt["Destaque"];
-    const tickerOpcao = opt["Código B3"];
-    const strike = opt["Strike"];
-    const distPct = opt["Distância (%)"];
-    const moneyness = opt["Moneyness"];
-    const premioEst = opt["Prêmio Est."];
-    const alvoValor = opt["Alvo (+150%)"];
-    
-    // No backend já vem 0.00 se for zero, ou com decimais.
-    const delta = opt["Delta"];
-
-    const isRecomendado = destaque !== "";
+  offsets.forEach((offset, idx) => {
+    const strike = Math.round((preco * (1 + offset * 0.03)) * 100) / 100;
+    const distPct = ((strike - preco) / preco) * 100;
+    const tickerOpcao = `${info.ticker.slice(0, 4)}${letraVenc}${Math.round(strike)}`;
+    const moneyness = Math.abs(distPct) < 1.0 ? "ATM" : ((isCall ? distPct < 0 : distPct > 0) ? "ITM" : "OTM");
+    const delta = deltas[idx];
+    const premioEst = Math.max(0.15, Math.round((Math.abs(delta) * 0.95 + 0.05) * 100) / 100);
+    const alvoValor = Math.round(premioEst * (1 + estado.multiplicadorAlvo) * 100) / 100;
+    const destaque = idx === 3 ? "⭐ RECOMENDADO" : "—";
 
     const tr = document.createElement("tr");
-    tr.className = `hover:bg-slate-900/60 transition ${isRecomendado ? 'bg-blue-950/20 font-bold text-white' : 'text-slate-300'}`;
+    tr.className = `hover:bg-slate-900/60 transition ${idx === 3 ? 'bg-blue-950/20 font-bold text-white' : 'text-slate-300'}`;
     tr.innerHTML = `
-      <td class="px-4 py-3 text-amber-400 font-sans text-xs">${destaque || "—"}</td>
+      <td class="px-4 py-3 text-amber-400 font-sans text-xs">${destaque}</td>
       <td class="px-4 py-3 text-white font-bold">${tickerOpcao}</td>
       <td class="px-4 py-3">R$ ${strike.toFixed(2)}</td>
-      <td class="px-4 py-3 ${distPct > 0 ? 'text-emerald-400' : 'text-rose-400'}">${distPct > 0 ? '+' : ''}${distPct.toFixed(1)}%</td>
-      <td class="px-4 py-3 text-slate-400 text-xs">${moneyness}</td>
-      <td class="px-4 py-3 font-mono text-slate-300">${delta.toFixed(2)}</td>
-      <td class="px-4 py-3 text-white">R$ ${premioEst.toFixed(2)}</td>
-      <td class="px-4 py-3 text-emerald-400">R$ ${alvoValor.toFixed(2)}</td>
-      <td class="px-4 py-3">
-        <button class="bg-blue-600 hover:bg-blue-500 text-white text-xs px-3 py-1 rounded transition-colors shadow shadow-blue-900/20">
-          Simular
-        </button>
-      </td>
+      <td class="px-4 py-3 ${distPct >= 0 ? 'text-emerald-400' : 'text-rose-400'}">${distPct >= 0 ? '+' : ''}${distPct.toFixed(1)}%</td>
+      <td class="px-4 py-3"><span class="px-1.5 py-0.5 rounded text-[10px] bg-slate-800 text-slate-300 border border-slate-700">${moneyness}</span></td>
+      <td class="px-4 py-3">${delta.toFixed(2)}</td>
+      <td class="px-4 py-3 text-slate-200">R$ ${premioEst.toFixed(2)}</td>
+      <td class="px-4 py-3 text-right font-bold text-blue-400">R$ ${alvoValor.toFixed(2)}</td>
     `;
     tbody.appendChild(tr);
   });
