@@ -19,7 +19,7 @@ async function carregarDados() {
   if (icone) icone.classList.add("animate-spin");
 
   try {
-    const res = await fetch(API_URL);
+    const res = await fetch(API_URL + "?t=" + Date.now());
     const dados = await res.json();
 
     if (dados.status === "sucesso") {
@@ -183,7 +183,13 @@ function renderizarPainelPrincipal() {
 }
 
 function renderizarGradeStrikes() {
-  const info = estado.radar[estado.ativoSelecionado];
+  const info = estado.radar[estado.ativoSelecionado] || {
+    ticker: estado.ativoSelecionado,
+    preco: 40.0,
+    regime_bull: true,
+    status: "⚪ Neutro",
+    tipo: "CALL"
+  };
   const preco = info.preco;
   
   // Pegar os dados da grade do backend
