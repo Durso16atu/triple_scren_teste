@@ -1,12 +1,12 @@
 {
   "metadata": {
     "pipeline_version": "1.3.0",
-    "timestamp_execucao": "2026-10-07T18:47:31.429564-03:00",
+    "timestamp_execucao": "2026-10-08T10:49:10.881729-03:00",
     "total_cesta": 1,
     "total_sinais": 0,
-    "status_mercado": "FECHADO",
+    "status_mercado": "ABERTO",
     "vencimento_alvo": "20/11/2026",
-    "dte_dias_uteis": 32
+    "dte_dias_uteis": 29
   },
   "sinais_ativos": [],
   "grade_opcoes": [
@@ -17,13 +17,13 @@
       "Strike": 38.0,
       "Distância (%)": -5.0,
       "Moneyness": "ITM (Dentro)",
-      "Delta": 0.78,
-      "Gamma": 0.083,
-      "Theta": -0.0285,
-      "Prêmio Est.": 2.98,
-      "Alvo (+150%)": 7.45,
+      "Delta": 0.79,
+      "Gamma": 0.0859,
+      "Theta": -0.0292,
+      "Prêmio Est.": 2.9,
+      "Alvo (+150%)": 7.25,
       "Vencimento": "20/11/2026",
-      "DTE (Dias Úteis)": 32
+      "DTE (Dias Úteis)": 29
     },
     {
       "Destaque": "",
@@ -33,12 +33,12 @@
       "Distância (%)": -2.5,
       "Moneyness": "ITM (Dentro)",
       "Delta": 0.69,
-      "Gamma": 0.0997,
-      "Theta": -0.0305,
-      "Prêmio Est.": 2.29,
-      "Alvo (+150%)": 5.72,
+      "Gamma": 0.1045,
+      "Theta": -0.0315,
+      "Prêmio Est.": 2.2,
+      "Alvo (+150%)": 5.5,
       "Vencimento": "20/11/2026",
-      "DTE (Dias Úteis)": 32
+      "DTE (Dias Úteis)": 29
     },
     {
       "Destaque": "",
@@ -47,43 +47,43 @@
       "Strike": 40.0,
       "Distância (%)": 0.0,
       "Moneyness": "ATM (No Dinheiro)",
-      "Delta": 0.58,
-      "Gamma": 0.1098,
-      "Theta": -0.0309,
-      "Prêmio Est.": 1.7,
-      "Alvo (+150%)": 4.25,
+      "Delta": 0.57,
+      "Gamma": 0.1155,
+      "Theta": -0.032,
+      "Prêmio Est.": 1.6,
+      "Alvo (+150%)": 4.0,
       "Vencimento": "20/11/2026",
-      "DTE (Dias Úteis)": 32
+      "DTE (Dias Úteis)": 29
     },
     {
-      "Destaque": "⭐ RECOMENDADA",
+      "Destaque": "",
       "Código B3": "ITUBK41",
       "Tipo": "CALL",
       "Strike": 41.0,
       "Distância (%)": 2.5,
       "Moneyness": "OTM (Fora)",
-      "Delta": 0.47,
-      "Gamma": 0.1116,
-      "Theta": -0.0296,
-      "Prêmio Est.": 1.22,
-      "Alvo (+150%)": 3.05,
+      "Delta": 0.46,
+      "Gamma": 0.117,
+      "Theta": -0.0306,
+      "Prêmio Est.": 1.13,
+      "Alvo (+150%)": 2.82,
       "Vencimento": "20/11/2026",
-      "DTE (Dias Úteis)": 32
+      "DTE (Dias Úteis)": 29
     },
     {
-      "Destaque": "",
+      "Destaque": "⭐ RECOMENDADA",
       "Código B3": "ITUBK42",
       "Tipo": "CALL",
       "Strike": 42.0,
       "Distância (%)": 5.0,
       "Moneyness": "OTM (Fora)",
-      "Delta": 0.36,
-      "Gamma": 0.1053,
-      "Theta": -0.0267,
-      "Prêmio Est.": 0.84,
-      "Alvo (+150%)": 2.1,
+      "Delta": 0.35,
+      "Gamma": 0.1091,
+      "Theta": -0.0273,
+      "Prêmio Est.": 0.76,
+      "Alvo (+150%)": 1.9,
       "Vencimento": "20/11/2026",
-      "DTE (Dias Úteis)": 32
+      "DTE (Dias Úteis)": 29
     }
   ],
   "grades_por_ativo": {
@@ -95,13 +95,13 @@
         "Strike": 38.0,
         "Distância (%)": -5.0,
         "Moneyness": "ITM (Dentro)",
-        "Delta": 0.78,
-        "Gamma": 0.083,
-        "Theta": -0.0285,
-        "Prêmio Est.": 2.98,
-        "Alvo (+150%)": 7.45,
+        "Delta": 0.79,
+        "Gamma": 0.0859,
+        "Theta": -0.0292,
+        "Prêmio Est.": 2.9,
+        "Alvo (+150%)": 7.25,
         "Vencimento": "20/11/2026",
-        "DTE (Dias Úteis)": 32
+        "DTE (Dias Úteis)": 29
       },
       {
         "Destaque": "",
@@ -111,12 +111,12 @@
         "Distância (%)": -2.5,
         "Moneyness": "ITM (Dentro)",
         "Delta": 0.69,
-        "Gamma": 0.0997,
-        "Theta": -0.0305,
-        "Prêmio Est.": 2.29,
-        "Alvo (+150%)": 5.72,
+        "Gamma": 0.1045,
+        "Theta": -0.0315,
+        "Prêmio Est.": 2.2,
+        "Alvo (+150%)": 5.5,
         "Vencimento": "20/11/2026",
-        "DTE (Dias Úteis)": 32
+        "DTE (Dias Úteis)": 29
       },
       {
         "Destaque": "",
@@ -125,43 +125,43 @@
         "Strike": 40.0,
         "Distância (%)": 0.0,
         "Moneyness": "ATM (No Dinheiro)",
-        "Delta": 0.58,
-        "Gamma": 0.1098,
-        "Theta": -0.0309,
-        "Prêmio Est.": 1.7,
-        "Alvo (+150%)": 4.25,
+        "Delta": 0.57,
+        "Gamma": 0.1155,
+        "Theta": -0.032,
+        "Prêmio Est.": 1.6,
+        "Alvo (+150%)": 4.0,
         "Vencimento": "20/11/2026",
-        "DTE (Dias Úteis)": 32
+        "DTE (Dias Úteis)": 29
       },
       {
-        "Destaque": "⭐ RECOMENDADA",
+        "Destaque": "",
         "Código B3": "ITUBK41",
         "Tipo": "CALL",
         "Strike": 41.0,
         "Distância (%)": 2.5,
         "Moneyness": "OTM (Fora)",
-        "Delta": 0.47,
-        "Gamma": 0.1116,
-        "Theta": -0.0296,
-        "Prêmio Est.": 1.22,
-        "Alvo (+150%)": 3.05,
+        "Delta": 0.46,
+        "Gamma": 0.117,
+        "Theta": -0.0306,
+        "Prêmio Est.": 1.13,
+        "Alvo (+150%)": 2.82,
         "Vencimento": "20/11/2026",
-        "DTE (Dias Úteis)": 32
+        "DTE (Dias Úteis)": 29
       },
       {
-        "Destaque": "",
+        "Destaque": "⭐ RECOMENDADA",
         "Código B3": "ITUBK42",
         "Tipo": "CALL",
         "Strike": 42.0,
         "Distância (%)": 5.0,
         "Moneyness": "OTM (Fora)",
-        "Delta": 0.36,
-        "Gamma": 0.1053,
-        "Theta": -0.0267,
-        "Prêmio Est.": 0.84,
-        "Alvo (+150%)": 2.1,
+        "Delta": 0.35,
+        "Gamma": 0.1091,
+        "Theta": -0.0273,
+        "Prêmio Est.": 0.76,
+        "Alvo (+150%)": 1.9,
         "Vencimento": "20/11/2026",
-        "DTE (Dias Úteis)": 32
+        "DTE (Dias Úteis)": 29
       }
     ]
   }

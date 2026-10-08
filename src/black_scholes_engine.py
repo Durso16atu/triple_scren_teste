@@ -18,6 +18,13 @@ TZ_SP = ZoneInfo("America/Sao_Paulo")
 LETRAS_CALL = {1: 'A', 2: 'B', 3: 'C', 4: 'D', 5: 'E', 6: 'F', 7: 'G', 8: 'H', 9: 'I', 10: 'J', 11: 'K', 12: 'L'}
 LETRAS_PUT  = {1: 'M', 2: 'N', 3: 'O', 4: 'P', 5: 'Q', 6: 'R', 7: 'S', 8: 'T', 9: 'U', 10: 'V', 11: 'W', 12: 'X'}
 
+FERIADOS_B3_2026 = [
+    '2026-01-01', '2026-02-16', '2026-02-17', '2026-04-03', '2026-04-21',
+    '2026-05-01', '2026-06-04', '2026-09-07', '2026-10-12', '2026-11-02',
+    '2026-11-15', '2026-11-20', '2026-12-25'
+]
+
+
 
 def strike_oficial_b3(preco_teorico: float, passo: float = 1.0) -> float:
     """
@@ -48,7 +55,7 @@ def obter_vencimento_mensal_alvo(
         data_base = datetime.now(TZ_SP).date()
 
     vencimento_atual = calcular_terceira_sexta(data_base.year, data_base.month)
-    dias_uteis_atual = int(np.busday_count(data_base, vencimento_atual)) if vencimento_atual > data_base else 0
+    dias_uteis_atual = int(np.busday_count(data_base, vencimento_atual, holidays=FERIADOS_B3_2026)) if vencimento_atual > data_base else 0
 
     if dias_uteis_atual < dte_minimo:
         mes_seguinte = data_base.month + 1 if data_base.month < 12 else 1
@@ -57,7 +64,7 @@ def obter_vencimento_mensal_alvo(
     else:
         vencimento_alvo = vencimento_atual
 
-    dias_uteis = int(np.busday_count(data_base, vencimento_alvo))
+    dias_uteis = int(np.busday_count(data_base, vencimento_alvo, holidays=FERIADOS_B3_2026))
     dias_uteis = max(dias_uteis, 1)
     return vencimento_alvo, dias_uteis
 
@@ -211,51 +218,40 @@ class BlackScholesEngine:
         tabela = LETRAS_CALL if tipo.upper() == "CALL" else LETRAS_PUT
         letra = tabela.get(mes_venc, 'K' if tipo.upper() == "CALL" else 'W')
 
-        # Configuração das 5 faixas: (-6% ITM, -3% ITM, ATM, +3% OTM, +6% OTM)
         if tipo.upper() == "CALL":
-            degraus = [
-                (-0.06, "ITM (Dentro)"),
-                (-0.03, "ITM (Dentro)"),
-                (0.00,  "ATM (No Dinheiro)"),
-                (0.03,  "OTM (Fora)"),
-                (0.06,  "OTM (Fora)")
-            ]
+            degraus = [(-0.06, "ITM (Dentro)"), (-0.03, "ITM (Dentro)"), (0.00,  "ATM (No Dinheiro)"), (0.03,  "OTM (Fora)"), (0.06,  "OTM (Fora)")]
         else:
-            degraus = [
-                (0.06,  "ITM (Dentro)"),
-                (0.03,  "ITM (Dentro)"),
-                (0.00,  "ATM (No Dinheiro)"),
-                (-0.03, "OTM (Fora)"),
-                (-0.06, "OTM (Fora)")
-            ]
+            degraus = [(0.06,  "ITM (Dentro)"), (0.03,  "ITM (Dentro)"), (0.00,  "ATM (No Dinheiro)"), (-0.03, "OTM (Fora)"), (-0.06, "OTM (Fora)")]
+
+        strikes_iniciais = [strike_oficial_b3(spot * (1.0 + off), passo=passo_strike) for off, _ in degraus]
+
+        if len(set(strikes_iniciais)) < len(strikes_iniciais):
+            atm_s = strike_oficial_b3(spot, passo=passo_strike)
+            if tipo.upper() == "CALL":
+                strikes_finais = [atm_s - 2*passo_strike, atm_s - passo_strike, atm_s, atm_s + passo_strike, atm_s + 2*passo_strike]
+            else:
+                strikes_finais = [atm_s + 2*passo_strike, atm_s + passo_strike, atm_s, atm_s - passo_strike, atm_s - 2*passo_strike]
+        else:
+            strikes_finais = strikes_iniciais
 
         grade = []
-        for idx, (offset, moneyness_label) in enumerate(degraus):
-            preco_teorico = spot * (1.0 + offset)
-            strike = strike_oficial_b3(preco_teorico, passo=passo_strike)
+        for strike, (offset, moneyness_label) in zip(strikes_finais, degraus):
             distancia = ((strike - spot) / spot) * 100.0
+            
+            if strike.is_integer():
+                codigo_opcao = f"{raiz}{letra}{int(strike)}"
+            else:
+                codigo_opcao = f"{raiz}{letra}{str(strike).replace('.', ',')}"
 
-            strike_num = int(round(strike))
-            codigo_opcao = f"{raiz}{letra}{strike_num}"
-
-            greeks = self.evaluate_option(
-                spot=spot,
-                strike=strike,
-                dte_business_days=dias_uteis,
-                option_type=tipo,
-                sigma=sigma
-            )
-
+            greeks = self.evaluate_option(spot=spot, strike=strike, dte_business_days=dias_uteis, option_type=tipo, sigma=sigma)
             premio_estimado = round(greeks["theoretical_price"], 2)
             alvo_150 = round(premio_estimado * 2.5, 2)
             delta = round(greeks["delta"], 2)
             gamma = round(greeks["gamma"], 4)
             theta_diario = round(greeks["theta_daily"], 4)
 
-            destaque = "⭐ RECOMENDADA" if idx == 3 else ""
-
             grade.append({
-                "Destaque": destaque,
+                "Destaque": "",
                 "Código B3": codigo_opcao,
                 "Tipo": tipo.upper(),
                 "Strike": strike,
@@ -270,5 +266,18 @@ class BlackScholesEngine:
                 "DTE (Dias Úteis)": dias_uteis
             })
 
-        df_grade = pd.DataFrame(grade)
-        return df_grade, vencimento, dias_uteis
+        idx_recomendado, menor_distancia = -1, 999.0
+        for i, item in enumerate(grade):
+            abs_delta = abs(item["Delta"])
+            if 0.30 <= abs_delta <= 0.45:
+                dist = abs(abs_delta - 0.375)
+                if dist < menor_distancia: menor_distancia, idx_recomendado = dist, i
+        
+        if idx_recomendado == -1:
+            for i, item in enumerate(grade):
+                dist = abs(abs(item["Delta"]) - 0.375)
+                if dist < menor_distancia: menor_distancia, idx_recomendado = dist, i
+                    
+        if idx_recomendado != -1: grade[idx_recomendado]["Destaque"] = "⭐ RECOMENDADA"
+
+        return pd.DataFrame(grade), vencimento, dias_uteis

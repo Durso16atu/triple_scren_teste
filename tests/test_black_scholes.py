@@ -48,7 +48,7 @@ class TestBlackScholesEngine(unittest.TestCase):
         data_base = datetime.date(2026, 10, 7)
         venc, dte = obter_vencimento_mensal_alvo(data_base=data_base, dte_minimo=15)
         self.assertEqual(venc, datetime.date(2026, 11, 20))
-        self.assertEqual(dte, 32)
+        self.assertEqual(dte, 30)
 
     def test_recalculo_gregas_e_theta(self):
         res = self.bs.evaluate_option(
@@ -76,7 +76,7 @@ class TestBlackScholesEngine(unittest.TestCase):
 
         self.assertEqual(len(df_grade), 5)
         self.assertEqual(venc, datetime.date(2026, 11, 20))
-        self.assertEqual(dte, 32)
+        self.assertEqual(dte, 30)
 
         # Verifica faixas (-6% ITM, -3% ITM, ATM, +3% OTM, +6% OTM)
         moneyness_esperado = [
@@ -105,3 +105,10 @@ class TestBlackScholesEngine(unittest.TestCase):
 if __name__ == "__main__":
     unittest.main()
 
+
+    def test_dte_08_outubro(self):
+        # 08/10/2026 -> 20/11/2026 deve ser 29 DU (descontando 12/10 e 02/11)
+        data_base = datetime.date(2026, 10, 8)
+        venc, dte = obter_vencimento_mensal_alvo(data_base=data_base, dte_minimo=15)
+        self.assertEqual(venc, datetime.date(2026, 11, 20))
+        self.assertEqual(dte, 29)
