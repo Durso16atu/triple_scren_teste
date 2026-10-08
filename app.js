@@ -190,7 +190,7 @@ function renderizarGradeStrikes() {
   let gradeBackend = info.grade_opcoes || [];
   
   const isCall = info.tipo === "CALL";
-  let diasUteis = 18;
+  let diasUteis = 29;
   let dataVenc = "20/11/2026";
   
   if (gradeBackend.length > 0) {
@@ -214,8 +214,48 @@ function renderizarGradeStrikes() {
   tbody.innerHTML = "";
 
   if (gradeBackend.length === 0) {
-      tbody.innerHTML = "<tr><td colspan='9' class='text-center py-4 text-slate-500'>Aguardando dados da B3...</td></tr>";
-      return;
+    // Generate dynamic fallback instead of empty message
+    const passo = preco < 20 ? 0.5 : (preco < 50 ? 1.0 : 2.0);
+    const strikeBase = Math.round(preco / passo) * passo;
+    
+    // Distances: -6%, -3%, 0%, +3%, +6%
+    const offsets = [-0.06, -0.03, 0, 0.03, 0.06];
+    
+    gradeBackend = offsets.map((off, i) => {
+       const strike = isCall ? strikeBase * (1 + off) : strikeBase * (1 - off);
+       const moneyness = i === 2 ? "ATM" : (i < 2 ? "ITM" : "OTM");
+       const distPct = isCall ? off * 100 : -off * 100;
+       
+       // Proportional mock based on Spot: e.g. ATM premium is ~ 4.5% of Spot
+       let basePremiumPct = 0.045; // 4.5%
+       if (i === 0) basePremiumPct = 0.07; // deep ITM
+       else if (i === 1) basePremiumPct = 0.055;
+       else if (i === 3) basePremiumPct = 0.03;
+       else if (i === 4) basePremiumPct = 0.015; // OTM
+       
+       const premioEst = preco * basePremiumPct;
+       const alvo = premioEst * 2.5; // +150%
+       
+       // Mock delta
+       let delta = 0.5;
+       if (i === 0) delta = isCall ? 0.8 : -0.8;
+       if (i === 1) delta = isCall ? 0.65 : -0.65;
+       if (i === 2) delta = isCall ? 0.5 : -0.5;
+       if (i === 3) delta = isCall ? 0.35 : -0.35;
+       if (i === 4) delta = isCall ? 0.2 : -0.2;
+       
+       return {
+         "Destaque": i === 2 ? "⭐ RECOMENDADA" : "",
+         "Código B3": `${info.ticker}K${Math.round(strike)}`,
+         "Strike": strike,
+         "Distância (%)": distPct,
+         "Moneyness": moneyness,
+         "Prêmio Est.": premioEst,
+         "Alvo (+150%)": alvo,
+         "Delta": delta,
+         "tipo_dado": "⚪ TEÓRICO (JS)"
+       };
+    });
   }
 
   gradeBackend.forEach((opt, idx) => {
