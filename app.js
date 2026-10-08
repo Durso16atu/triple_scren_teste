@@ -230,6 +230,11 @@ function renderizarGradeStrikes() {
     // No backend já vem 0.00 se for zero, ou com decimais.
     const delta = opt["Delta"];
 
+    const tipoDado = opt["tipo_dado"] || "⚪ TEÓRICO (BS)";
+    const badgeHtml = tipoDado.includes("REAL") 
+      ? `<span class="bg-emerald-950 text-emerald-400 border border-emerald-500/30 px-2 py-0.5 rounded text-[10px] whitespace-nowrap">${tipoDado}</span>`
+      : `<span class="bg-slate-800 text-slate-300 border border-slate-600 px-2 py-0.5 rounded text-[10px] whitespace-nowrap">${tipoDado}</span>`;
+
     const isRecomendado = destaque !== "";
 
     const tr = document.createElement("tr");
@@ -242,13 +247,14 @@ function renderizarGradeStrikes() {
       <td class="px-4 py-3 text-slate-400 text-xs">${moneyness}</td>
       <td class="px-4 py-3 font-mono text-slate-300">${delta.toFixed(2)}</td>
       <td class="px-4 py-3 text-white">R$ ${premioEst.toFixed(2)}</td>
-      <td class="px-4 py-3 text-emerald-400">R$ ${alvoValor.toFixed(2)}</td>
-      <td class="px-4 py-3">
-        <button class="bg-blue-600 hover:bg-blue-500 text-white text-xs px-3 py-1 rounded transition-colors shadow shadow-blue-900/20">
-          Simular
-        </button>
+      <td class="px-4 py-3 text-emerald-400 flex items-center gap-2">
+        R$ ${alvoValor.toFixed(2)}
+      </td>
+      <td class="px-4 py-3 text-right">
+        ${badgeHtml}
       </td>
     `;
+
     tbody.appendChild(tr);
   });
 }

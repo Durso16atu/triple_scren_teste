@@ -18,6 +18,7 @@ import requests
 
 try:
     from src.webhook_dispatcher import WebhookDispatcher
+    from src.options_market_validator import OptionsMarketValidator
 except ImportError:
     from webhook_dispatcher import WebhookDispatcher
 
@@ -290,6 +291,7 @@ class MonitorRealtimeB3:
         self.creator = SubAgenteCreator()
         self.reviewer = SubAgenteReviewer(GuardrailsAtuariais())
         self.webhook = webhook or WebhookDispatcher()
+        self.validator = OptionsMarketValidator(timeout_sec=3)
 
     def executar_ciclo(self):
         agora_sp = datetime.now(TZ_SP)
@@ -322,7 +324,9 @@ class MonitorRealtimeB3:
                     sigma=vol_ticker,
                     tipo="CALL"
                 )
-                grades_ativas[ticker] = df_g.to_dict(orient="records")
+                grade_teorica = df_g.to_dict(orient="records")
+                grade_validada = self.validator.validar_grade(grade_teorica)
+                grades_ativas[ticker] = grade_validada
                 precos_spot[ticker] = spot_ticker
 
                 p = self.creator.avaliar_ativo(ticker, df_d, df_60, df_15)
@@ -341,7 +345,7 @@ class MonitorRealtimeB3:
 
         grade_opcoes_ciclo = []
         if oportunidades and oportunidades[0].grade_opcoes:
-            grade_opcoes_ciclo = oportunidades[0].grade_opcoes
+            grade_opcoes_ciclo = grades_ativas.get(oportunidades[0].ticker_ativo, oportunidades[0].grade_opcoes)
         elif grades_ativas:
             primeiro_ticker = next((t for t in ["ITUB4.SA", "PETR4.SA", "BOVA11.SA"] if t in grades_ativas), next(iter(grades_ativas.keys())))
             grade_opcoes_ciclo = grades_ativas[primeiro_ticker]
