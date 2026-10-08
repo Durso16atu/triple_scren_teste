@@ -242,47 +242,42 @@ function renderizarGradeStrikes() {
   tbody.innerHTML = "";
 
   if (gradeBackend.length === 0) {
-    // Generate dynamic fallback instead of empty message
-    const passo = preco < 20 ? 0.5 : (preco < 50 ? 1.0 : 2.0);
-    const strikeBase = Math.round(preco / passo) * passo;
+    const dte = 29;
+    const tAnos = dte / 252.0;
     
-    // Distances: -6%, -3%, 0%, +3%, +6%
-    const offsets = [-0.06, -0.03, 0, 0.03, 0.06];
-    
-    gradeBackend = offsets.map((off, i) => {
-       const strike = isCall ? strikeBase * (1 + off) : strikeBase * (1 - off);
-       const moneyness = i === 2 ? "ATM" : (i < 2 ? "ITM" : "OTM");
-       const distPct = isCall ? off * 100 : -off * 100;
-       
-       // Proportional mock based on Spot: e.g. ATM premium is ~ 4.5% of Spot
-       let basePremiumPct = 0.045; // 4.5%
-       if (i === 0) basePremiumPct = 0.07; // deep ITM
-       else if (i === 1) basePremiumPct = 0.055;
-       else if (i === 3) basePremiumPct = 0.03;
-       else if (i === 4) basePremiumPct = 0.015; // OTM
-       
-       const premioEst = preco * basePremiumPct;
-       const alvo = premioEst * 2.5; // +150%
-       
-       // Mock delta
-       let delta = 0.5;
-       if (i === 0) delta = isCall ? 0.8 : -0.8;
-       if (i === 1) delta = isCall ? 0.65 : -0.65;
-       if (i === 2) delta = isCall ? 0.5 : -0.5;
-       if (i === 3) delta = isCall ? 0.35 : -0.35;
-       if (i === 4) delta = isCall ? 0.2 : -0.2;
-       
-       return {
-         "Destaque": i === 2 ? "⭐ RECOMENDADA" : "",
-         "Código B3": `${info.ticker}K${Math.round(strike)}`,
-         "Strike": strike,
-         "Distância (%)": distPct,
-         "Moneyness": moneyness,
-         "Prêmio Est.": premioEst,
-         "Alvo (+150%)": alvo,
-         "Delta": delta,
-         "tipo_dado": "⚪ TEÓRICO (JS)"
-       };
+    // 5 Strikes proporcionais ao Spot (-6%, -3%, ATM, +3%, +6%)
+    const deltasConfig = [
+      { rotulo: "-6.0%", pct: -0.06, tipo: "ITM", delta: 0.72 },
+      { rotulo: "-3.0%", pct: -0.03, tipo: "ITM", delta: 0.58 },
+      { rotulo: "+0.0%", pct:  0.00, tipo: "ATM", delta: 0.45 },
+      { rotulo: "+3.0%", pct:  0.03, tipo: "OTM", delta: 0.32, rec: true },
+      { rotulo: "+6.0%", pct:  0.06, tipo: "OTM", delta: 0.18 }
+    ];
+
+    const prefixo = info.ticker.replace(/[^A-Z]/g, '').slice(0, 4) + 'K';
+
+    gradeBackend = deltasConfig.map(cfg => {
+      const strike = Number((preco * (1 + cfg.pct)).toFixed(2));
+      const strikeInt = Math.round(strike);
+      const codigo = `${prefixo}${strikeInt}`;
+      
+      // Modelo Atuarial Simplificado: Intrínseco + Valor Tempo (Black-Scholes proxy)
+      const intrinseco = Math.max(0, preco - strike);
+      const valorTempo = preco * 0.28 * Math.sqrt(tAnos) * (1 - Math.abs(cfg.pct) * 3);
+      const premio = Number(Math.max(0.05, intrinseco + Math.max(0.05, valorTempo)).toFixed(2));
+      const alvo150 = Number((premio * 2.5).toFixed(2));
+
+      return {
+        "Destaque": cfg.rec ? "⭐ RECOMENDADA" : "",
+        "Código B3": codigo,
+        "Strike": strike,
+        "Distância (%)": cfg.pct * 100,
+        "Moneyness": cfg.tipo,
+        "Delta": cfg.delta,
+        "Prêmio Est.": premio,
+        "Alvo (+150%)": alvo150,
+        "tipo_dado": "⚪ TEÓRICO (JS)"
+      };
     });
   }
 
