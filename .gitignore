@@ -17,3 +17,22 @@ data/
 *.parquet
 *.bin
 metricas_resumo.json
+
+# Artefatos temporários e remendos de agentes
+fix_*.py
+update_*.py
+atualizar_*.py
+restore_*.py
+debug_*.py
+*_original.*
+*.tmp
+
+# Protecao contra scripts descartaveis
+fix_*.py
+update_*.py
+update_*.js
+atualizar_*.py
+restore_*.py
+debug_*.py
+*_original.*
+*.tmp

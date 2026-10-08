@@ -21,6 +21,7 @@ try:
     from src.options_market_validator import OptionsMarketValidator
 except ImportError:
     from webhook_dispatcher import WebhookDispatcher
+    from options_market_validator import OptionsMarketValidator
 
 try:
     from src.black_scholes_engine import (
